@@ -9,3 +9,7 @@ This repository is a library that contains the implementation of the optimized T
 3. Install the required python packages (Qiskit related), and the Julia package using `make install`
 4. Run `make smoke` to execute a simplistic example of maxcut_qaoa that uses vanilla adapt and uses the qiskit interface to validate the installation.
 5. 
+
+
+## TODO:
+1. Unskip docs step in CI
