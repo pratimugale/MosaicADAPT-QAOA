@@ -86,7 +86,7 @@ function ADAPT.adapt!(
 
     else
         # MAKE SELECTION - GREEDY
-        @info "Performing selection using greed method"
+        @info "Performing selection using greedy method"
 
         candidates = Dict(pool .=> scores)
         imap = Dict(pool .=> eachindex(pool))
