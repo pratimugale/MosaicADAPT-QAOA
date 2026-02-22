@@ -20,6 +20,7 @@ IMPORTANT: the `callback` attribute of `options` will be generated automatically
 struct OptimOptimizer <: ADAPT.OptimizationProtocol
     method::Optim.AbstractOptimizer
     options::Optim.Options
+    jitter::Float64
 end
 
 """
@@ -36,12 +37,12 @@ You can pass any keyword argument accepted either by
 If you try to pass a `callback` keyword argument, it will be ignored (see above).
 
 """
-function OptimOptimizer(method::Symbol; options...)
+function OptimOptimizer(method::Symbol; jitter::Float64=0.0, options...)
     method_type = getfield(Optim, method)
 
     # EXTRACT METHOD kwargs FROM options
     method_fields = fieldnames(method_type)
-    method_kwargs = Dict{Symbol, Any}()
+    method_kwargs = Dict{Symbol,Any}()
     for field in keys(options)
         if field in method_fields
             method_fields[field] = pop!(options, field)
@@ -52,12 +53,13 @@ function OptimOptimizer(method::Symbol; options...)
     return OptimOptimizer(
         method_type(; method_kwargs...),
         Optim.Options(; options...),
+        jitter
     )
 end
 
 function options_with_callback(options, callback)
     cb = options.store_trace ? (trace) -> callback(last(trace)) : callback
-    kwargs = Dict(field=>getfield(options, field) for field in fieldnames(Optim.Options))
+    kwargs = Dict(field => getfield(options, field) for field in fieldnames(Optim.Options))
     return Optim.Options(; kwargs..., callback=cb)
 end
 
@@ -130,8 +132,8 @@ function make_callback(
         ADAPT.bind!(ansatz, state.x);   # TODO: Is `x` a guaranteed field of `state`?
         data = make_data(iterdata, objective, state);
         stop = false;
-        for callback in callbacks;
-            stop = stop || callback(data, ansatz, trace, VQE, observable, reference);
+        for callback in callbacks
+            stop = stop || callback(data, ansatz, trace, VQE, observable, reference)
             # As soon as `stop` is true, subsequent callbacks are short-circuited.
         end;
         # TODO: Consider updating `state.x` so callbacks can control x. Seems dangerous...
@@ -159,11 +161,17 @@ function ADAPT.optimize!(
     )
     # TODO: Generalize interface for 0th/2nd order methods, and 1st w/finite difference.
 
+    initial_x = copy(ADAPT.angles(ansatz))
+    if VQE.jitter > 0.0
+        # Add random Gaussian noise scaled by the jitter factor to break local minima
+        initial_x .+= randn(length(initial_x)) .* VQE.jitter
+    end
+
     state = Optim.initial_state(
         VQE.method,
         VQE.options,                    # NOTE: Pretty sure this argument is inert.
         objective,
-        copy(ADAPT.angles(ansatz)),
+        initial_x,
     )
 
     callback = make_callback(
@@ -174,7 +182,7 @@ function ADAPT.optimize!(
     # RUN OPTIMIZATION
     result = Optim.optimize(
         objective,
-        copy(ADAPT.angles(ansatz)),
+        initial_x,
         VQE.method,
         options_with_callback(VQE.options, callback),
         state,
