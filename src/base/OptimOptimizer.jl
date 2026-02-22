@@ -153,19 +153,19 @@ function ADAPT.optimize!(
     reference::ADAPT.QuantumState,
     callbacks::ADAPT.CallbackList,
 )
-    # INITIALIZE OPTIMIZATION OBJECTS
-    objective = Optim.OnceDifferentiable(
-        ADAPT.make_costfunction(ansatz, observable, reference),
-        ADAPT.make_gradfunction!(ansatz, observable, reference),
-        copy(ADAPT.angles(ansatz)),     # NOTE: This copy is pry redundant. But safer.
-    )
-    # TODO: Generalize interface for 0th/2nd order methods, and 1st w/finite difference.
-
     initial_x = copy(ADAPT.angles(ansatz))
     if VQE.jitter > 0.0
         # Add random Gaussian noise scaled by the jitter factor to break local minima
         initial_x .+= randn(length(initial_x)) .* VQE.jitter
     end
+
+    # INITIALIZE OPTIMIZATION OBJECTS
+    objective = Optim.OnceDifferentiable(
+        ADAPT.make_costfunction(ansatz, observable, reference),
+        ADAPT.make_gradfunction!(ansatz, observable, reference),
+        initial_x,
+    )
+    # TODO: Generalize interface for 0th/2nd order methods, and 1st w/finite difference.
 
     state = Optim.initial_state(
         VQE.method,
