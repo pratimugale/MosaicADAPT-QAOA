@@ -62,6 +62,7 @@ function ADAPT.adapt!(
     ε = eps(ADAPT.typeof_score(adapt_type))
     if all(score -> abs(score) < ε, scores)
         ADAPT.set_converged!(ansatz, true)
+        trace[:callback_flagged] = "AllGradientsHitMachineEpsilon"
         return false
     end
 
@@ -111,6 +112,8 @@ function ADAPT.adapt!(
     # DEFER TO CALLBACKS
     data = ADAPT.Data(
         :scores => scores,
+        :max_pool_gradient => maximum(abs.(scores)),
+        :sum_gradients => sum(abs.(selected_scores)),
         :selected_index => selected_indices,
         :selected_score => selected_scores,
         :selected_generator => selected_generators,
